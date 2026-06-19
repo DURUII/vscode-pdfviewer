@@ -1,9 +1,9 @@
 {
-  "name": "pdf",
-  "displayName": "vscode-pdf",
-  "description": "Display pdf file in VSCode.",
-  "version": "1.2.2",
-  "publisher": "tomoki1207",
+  "name": "pdf-citation-preview",
+  "displayName": "PDF Citation Preview",
+  "description": "Display PDF files in VS Code with citation hover previews.",
+  "version": "0.1.3",
+  "publisher": "durui",
   "engines": {
     "vscode": "^1.46.0"
   },
@@ -17,13 +17,13 @@
   "icon": "vscode-pdf.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tomoki1207/vscode-pdfviewer.git"
+    "url": "https://github.com/DURUII/vscode-pdfviewer.git"
   },
   "bugs": {
-    "url": "https://github.com/tomoki1207/vscode-pdfviewer/issues"
+    "url": "https://github.com/DURUII/vscode-pdfviewer/issues"
   },
   "activationEvents": [
-    "onCustomEditor:pdf.preview"
+    "onCustomEditor:durui.pdfCitationPreview"
   ],
   "main": "./out/src/extension",
   "contributes": {
@@ -34,8 +34,8 @@
     },
     "customEditors": [
       {
-        "viewType": "pdf.preview",
-        "displayName": "Pdf Preview",
+        "viewType": "durui.pdfCitationPreview",
+        "displayName": "PDF Citation Preview",
         "selector": [
           {
             "filenamePattern": "*.pdf"

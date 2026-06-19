@@ -104,6 +104,12 @@ export class PdfPreview extends Disposable {
     };
 
     const config = vscode.workspace.getConfiguration('pdf-preview');
+    const citationPreviewScript = resolveAsUri(
+      'lib',
+      'citationPreview.js'
+    ).with({
+      query: `v=${Date.now().toString(36)}`,
+    });
     const settings = {
       cMapUrl: resolveAsUri('lib', 'web', 'cmaps/').toString(),
       path: docPath.toString(),
@@ -140,6 +146,7 @@ export class PdfPreview extends Disposable {
 <script src="${resolveAsUri('lib', 'build', 'pdf.worker.js')}"></script>
 <script src="${resolveAsUri('lib', 'web', 'viewer.js')}"></script>
 <script src="${resolveAsUri('lib', 'main.js')}"></script>
+<script src="${citationPreviewScript}"></script>
 </head>`;
 
     const body = `<body tabindex="1">
