@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as os from 'os';
 import * as vscode from 'vscode';
 import { Disposable } from './disposable';
 
@@ -64,6 +65,10 @@ export class PdfPreview extends Disposable {
           }
           case 'scholar-ask-ai': {
             await this.createScholarQuestion(message.annotation);
+            break;
+          }
+          case 'scholar-save-image-snapshot': {
+            await this.saveScholarImageSnapshot(message);
             break;
           }
         }
@@ -165,6 +170,48 @@ export class PdfPreview extends Disposable {
     vscode.window.showInformationMessage(
       'Scholar PDF Viewer saved the question and copied the AI prompt.'
     );
+  }
+
+  private async saveScholarImageSnapshot(message: {
+    requestId?: string;
+    dataUrl?: string;
+    pageNumber?: number;
+  }): Promise<void> {
+    const requestId = message.requestId;
+    try {
+      const match = /^data:image\/png;base64,(.+)$/.exec(message.dataUrl || '');
+      if (!match) {
+        throw new Error('Invalid image snapshot payload.');
+      }
+      const dir = path.join(os.tmpdir(), 'scholar-pdfviewer');
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(dir));
+      const pdfBase = path
+        .basename(this.resource.fsPath, path.extname(this.resource.fsPath))
+        .replace(/[^A-Za-z0-9._-]+/g, '-');
+      const page = Number.isFinite(message.pageNumber)
+        ? `p${message.pageNumber}`
+        : 'page';
+      const filePath = path.join(
+        dir,
+        `${pdfBase}-${page}-${Date.now().toString(36)}.png`
+      );
+      await vscode.workspace.fs.writeFile(
+        vscode.Uri.file(filePath),
+        Buffer.from(match[1], 'base64')
+      );
+      await vscode.env.clipboard.writeText(filePath);
+      this.webviewEditor.webview.postMessage({
+        type: 'scholar-image-snapshot-saved',
+        requestId,
+        path: filePath,
+      });
+    } catch (err) {
+      this.webviewEditor.webview.postMessage({
+        type: 'scholar-image-snapshot-error',
+        requestId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private async appendScholarAnnotation(
@@ -312,11 +359,7 @@ export class PdfPreview extends Disposable {
   <meta id="pdf-preview-config" data-config="${escapeAttribute(
     JSON.stringify(settings)
   )}">
-  <link rel="stylesheet" href="${resolveAsUri(
-    'lib',
-    'web',
-    'pdf_viewer.css'
-  )}">
+  <link rel="stylesheet" href="${resolveAsUri('lib', 'web', 'pdf_viewer.css')}">
   <link rel="stylesheet" href="${resolveAsUri('lib', 'pdf.css')}">
   <link rel="stylesheet" href="${resolveAsUri('lib', 'scholarViewer.css')}">
   <script>
@@ -470,8 +513,12 @@ export class PdfPreview extends Disposable {
     </div>
   </div>
   <div id="selectionPopup" class="hidden" role="toolbar" aria-label="Scholar selection actions">
+    <button id="selectionCopy" type="button" title="Copy selection">Copy</button>
     <button id="selectionHighlight" type="button" title="Highlight selection">Highlight</button>
     <button id="selectionComment" type="button" title="Comment on selection">Comment</button>
+  </div>
+  <div id="imagePopup" class="hidden" role="toolbar" aria-label="Scholar image actions">
+    <button id="imageCopy" type="button" title="Save image crop and copy path">Copy Image</button>
   </div>
   <div id="commentPopup" class="hidden" role="dialog" aria-label="Comment">
     <textarea id="commentText" placeholder="Comment"></textarea>

@@ -348,7 +348,8 @@ body.handTool #viewerContainer .textLayer span {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-#selectionPopup {
+#selectionPopup,
+#imagePopup {
   position: fixed;
   z-index: 100000;
   display: flex;
@@ -364,12 +365,15 @@ body.handTool #viewerContainer .textLayer span {
   font: inherit;
 }
 
-#selectionPopup.hidden {
+#selectionPopup.hidden,
+#imagePopup.hidden {
   display: none;
 }
 
-#selectionPopup button {
+#selectionPopup button,
+#imagePopup button {
   height: 24px;
+  min-width: 58px;
   padding: 0 8px;
   color: inherit;
   background: transparent;
@@ -380,11 +384,18 @@ body.handTool #viewerContainer .textLayer span {
   cursor: pointer;
 }
 
-#selectionPopup button:hover {
+#selectionPopup button.copied,
+#imagePopup button.copied {
+  color: var(--vscode-testing-iconPassed, #73c991);
+}
+
+#selectionPopup button:hover,
+#imagePopup button:hover {
   background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
 }
 
-#selectionPopup button:focus-visible {
+#selectionPopup button:focus-visible,
+#imagePopup button:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: -1px;
 }

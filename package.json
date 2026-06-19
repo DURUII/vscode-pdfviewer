@@ -2,7 +2,7 @@
   "name": "scholar-pdfviewer",
   "displayName": "Scholar PDF Viewer",
   "description": "A VS Code PDF reader for academic papers, references, citations, and annotations.",
-  "version": "0.2.13",
+  "version": "0.2.15",
   "publisher": "durui",
   "engines": {
     "vscode": "^1.46.0"
@@ -101,6 +101,7 @@
     "watch": "tsc -w -p ./",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js",
+    "check:image-objects": "node scripts/check-image-objects.mjs ../paper-rev2/main.pdf",
     "lint": "eslint -c .eslintrc.json --ext .ts ./src",
     "package": "vsce package"
   },
