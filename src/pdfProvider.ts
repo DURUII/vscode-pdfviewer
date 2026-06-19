@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { PdfPreview } from './pdfPreview';
 
 export class PdfCustomProvider implements vscode.CustomReadonlyEditorProvider {
-  public static readonly viewType = 'durui.pdfCitationPreview';
+  public static readonly viewType = 'durui.scholarPdfViewer';
 
   private readonly _previews = new Set<PdfPreview>();
   private _activePreview: PdfPreview | undefined;
