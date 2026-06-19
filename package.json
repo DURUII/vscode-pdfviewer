@@ -2,7 +2,7 @@
   "name": "scholar-pdfviewer",
   "displayName": "Scholar PDF Viewer",
   "description": "A VS Code PDF reader for academic papers, references, citations, and annotations.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "durui",
   "engines": {
     "vscode": "^1.46.0"

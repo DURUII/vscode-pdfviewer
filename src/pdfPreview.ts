@@ -8,6 +8,22 @@ function escapeAttribute(value: string | vscode.Uri): string {
 
 type PreviewState = 'Disposed' | 'Visible' | 'Active';
 
+interface ScholarAnnotation {
+  id: string;
+  type: 'highlight' | 'comment' | 'question';
+  pdf: string;
+  createdAt: string;
+  text: string;
+  comment?: string;
+  rects: Array<{
+    page: number;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }>;
+}
+
 export class PdfPreview extends Disposable {
   private _previewState: PreviewState = 'Visible';
 
@@ -27,7 +43,7 @@ export class PdfPreview extends Disposable {
     };
 
     this._register(
-      webviewEditor.webview.onDidReceiveMessage((message) => {
+      webviewEditor.webview.onDidReceiveMessage(async (message) => {
         switch (message.type) {
           case 'reopen-as-text': {
             vscode.commands.executeCommand(
@@ -36,6 +52,18 @@ export class PdfPreview extends Disposable {
               'default',
               webviewEditor.viewColumn
             );
+            break;
+          }
+          case 'scholar-load-annotations': {
+            await this.loadScholarAnnotations();
+            break;
+          }
+          case 'scholar-create-annotation': {
+            await this.createScholarAnnotation(message.annotation);
+            break;
+          }
+          case 'scholar-ask-ai': {
+            await this.createScholarQuestion(message.annotation);
             break;
           }
         }
@@ -76,6 +104,136 @@ export class PdfPreview extends Disposable {
     this.update();
   }
 
+  private async loadScholarAnnotations(): Promise<void> {
+    const annotations = await this.readScholarAnnotations();
+    this.webviewEditor.webview.postMessage({
+      type: 'scholar-annotations-loaded',
+      annotations,
+    });
+  }
+
+  private async createScholarAnnotation(
+    annotation: ScholarAnnotation
+  ): Promise<void> {
+    if (!annotation || !annotation.text || !Array.isArray(annotation.rects)) {
+      return;
+    }
+    if (annotation.type === 'comment' && !annotation.comment) {
+      const comment = await vscode.window.showInputBox({
+        prompt: 'Comment on selected PDF text',
+      });
+      if (comment === undefined) {
+        return;
+      }
+      annotation = { ...annotation, comment };
+    }
+    const saved = await this.appendScholarAnnotation(annotation);
+    this.webviewEditor.webview.postMessage({
+      type: 'scholar-annotation-created',
+      annotation: saved,
+    });
+  }
+
+  private async createScholarQuestion(
+    annotation: ScholarAnnotation
+  ): Promise<void> {
+    const comment = await vscode.window.showInputBox({
+      prompt: 'Question or instruction for the agent',
+      value: 'Explain this passage.',
+    });
+    if (comment === undefined) {
+      return;
+    }
+    await this.createScholarAnnotation({
+      ...annotation,
+      type: 'question',
+      comment,
+    });
+    await vscode.env.clipboard.writeText(
+      [
+        'Please help with this PDF passage.',
+        '',
+        `PDF: ${path.basename(this.resource.fsPath)}`,
+        '',
+        'Selected text:',
+        annotation.text,
+        '',
+        'Question:',
+        comment,
+      ].join('\n')
+    );
+    vscode.window.showInformationMessage(
+      'Scholar PDF Viewer saved the question and copied the AI prompt.'
+    );
+  }
+
+  private async appendScholarAnnotation(
+    annotation: ScholarAnnotation
+  ): Promise<ScholarAnnotation> {
+    const saved = {
+      ...annotation,
+      id: annotation.id || this.createAnnotationId(),
+      pdf: path.basename(this.resource.fsPath),
+      createdAt: annotation.createdAt || new Date().toISOString(),
+    };
+    const uri = this.getScholarAnnotationsUri();
+    await vscode.workspace.fs.createDirectory(
+      vscode.Uri.file(path.dirname(uri.fsPath))
+    );
+    const existing = await this.readFileText(uri);
+    const next = `${existing}${
+      existing.endsWith('\n') || !existing ? '' : '\n'
+    }${JSON.stringify(saved)}\n`;
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(next, 'utf8'));
+    return saved;
+  }
+
+  private async readScholarAnnotations(): Promise<ScholarAnnotation[]> {
+    const text = await this.readFileText(this.getScholarAnnotationsUri());
+    const annotations: ScholarAnnotation[] = [];
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        annotations.push(JSON.parse(line) as ScholarAnnotation);
+      } catch (_err) {
+        // Ignore malformed lines so one bad manual edit does not break viewing.
+      }
+    }
+    return annotations;
+  }
+
+  private async readFileText(uri: vscode.Uri): Promise<string> {
+    try {
+      const data = await vscode.workspace.fs.readFile(uri);
+      return Buffer.from(data).toString('utf8');
+    } catch (err) {
+      const code =
+        err && typeof err === 'object'
+          ? (err as { code?: string }).code
+          : undefined;
+      if (code === 'FileNotFound') {
+        return '';
+      }
+      throw err;
+    }
+  }
+
+  private getScholarAnnotationsUri(): vscode.Uri {
+    const pdfDir = path.dirname(this.resource.fsPath);
+    const pdfName = path.basename(this.resource.fsPath);
+    return vscode.Uri.file(
+      path.join(pdfDir, '.scholar', `${pdfName}.annotations.jsonl`)
+    );
+  }
+
+  private createAnnotationId(): string {
+    return `ann_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+  }
+
   private reload(): void {
     if (this._previewState !== 'Disposed') {
       this.webviewEditor.webview.postMessage({ type: 'reload' });
@@ -108,6 +266,9 @@ export class PdfPreview extends Disposable {
       'lib',
       'citationPreview.js'
     ).with({
+      query: `v=${Date.now().toString(36)}`,
+    });
+    const scholarOverlayScript = resolveAsUri('lib', 'scholarOverlay.js').with({
       query: `v=${Date.now().toString(36)}`,
     });
     const settings = {
@@ -147,6 +308,7 @@ export class PdfPreview extends Disposable {
 <script src="${resolveAsUri('lib', 'web', 'viewer.js')}"></script>
 <script src="${resolveAsUri('lib', 'main.js')}"></script>
 <script src="${citationPreviewScript}"></script>
+<script src="${scholarOverlayScript}"></script>
 </head>`;
 
     const body = `<body tabindex="1">
